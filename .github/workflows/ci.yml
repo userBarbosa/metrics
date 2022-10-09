@@ -109,7 +109,7 @@ jobs:
           METRICS_VERSION=$(cat package.json | grep -Po '(?<="version": ")\d+[.]\d+(?=[.]0-beta")')
           METRICS_VERSION_BETA="$METRICS_VERSION-beta"
           set -e
-          if [[ "$METRICS_VERSION_BETA" != "v-beta" ]]; then
+          if [[ ! -z "$METRICS_VERSION" ]]; then
             echo "Beta version: v$METRICS_VERSION_BETA"
             docker tag ghcr.io/lowlighter/metrics:master ghcr.io/lowlighter/metrics:$(echo "v$METRICS_VERSION_BETA")
             docker push ghcr.io/lowlighter/metrics:$(echo "v$METRICS_VERSION_BETA")
@@ -156,6 +156,7 @@ jobs:
       METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
       METRICS_TOKEN_WITH_SCOPES: ${{ secrets.METRICS_TOKEN_WITH_SCOPES }}
       METRICS_TOKEN_PERSONAL: ${{ secrets.METRICS_TOKEN_PERSONAL }}
+      CHESS_TOKEN: ${{ secrets.CHESS_TOKEN }}
       PAGESPEED_TOKEN: ${{ secrets.PAGESPEED_TOKEN }}
       GOOGLE_MAP_TOKEN: ${{ secrets.GOOGLE_MAP_TOKEN }}
       SPOTIFY_TOKENS: ${{ secrets.SPOTIFY_TOKENS }}

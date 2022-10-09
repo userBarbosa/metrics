@@ -164,6 +164,7 @@ lastfm
 lastname
 leaderboard
 lecoq
+leetcode
 legoandmars
 libgconf
 libssl
@@ -172,6 +173,7 @@ libxml
 libxmljs
 libxss
 libxtst
+lichess
 linux
 lng
 localhost
@@ -234,6 +236,7 @@ params
 patchnote
 pdated
 pened
+Pgn
 PGP
 playcount
 playlists

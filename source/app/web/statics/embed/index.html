@@ -8,8 +8,8 @@
     <meta name="author" content="lowlighter">
     <meta property="og:image" content="/.opengraph.png">
     <link rel="icon" href="/.favicon.png">
-    <link rel="stylesheet" href="/.css/style.vars.css?v=3.28">
-    <link rel="stylesheet" href="/.css/style.css?v=3.28">
+    <link rel="stylesheet" href="/.css/style.vars.css?v=3.29">
+    <link rel="stylesheet" href="/.css/style.css?v=3.29">
     <link rel="stylesheet" href="/.css/style.prism.css" />
   </head>
   <body>
@@ -190,6 +190,9 @@
               <div class="image" :class="{pending:generated.pending}" v-html="generated.content||templates.placeholder.image"></div>
             </div>
             <div v-else-if="tab == 'markdown'">
+              <div>
+                <button class="copy-markdown" data-clipboard-target=".code">Copy Markdown Code</button>
+              </div>
               Add the markdown below to your <i>README.md</i> <template v-if="user">at <a :href="repo">{{ user }}/{{ user }}</a></template>
               <div class="code">
                 <Prism language="markdown" :code="embed"></Prism>
@@ -227,7 +230,7 @@
     <script src="/.js/vue.min.js"></script>
     <script src="/.js/vue.prism.min.js"></script>
     <script src="/.js/clipboard.min.js"></script>
-    <script src="/.js/embed/app.placeholder.js?v=3.28"></script>
-    <script src="/.js/embed/app.js?v=3.28"></script>
+    <script src="/.js/embed/app.placeholder.js?v=3.29"></script>
+    <script src="/.js/embed/app.js?v=3.29"></script>
   </body>
 </html>
