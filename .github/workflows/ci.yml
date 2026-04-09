@@ -20,19 +20,16 @@ jobs:
     if: always() && (needs.build-test-analyze.result == 'success' || needs.build-test-analyze.result == 'skipped')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Setup Dprint
-        run: |
-          curl -fsSL https://dprint.dev/install.sh | sh
-          cp /home/runner/.dprint/bin/dprint /usr/local/bin/dprint
-          npm install -g eslint
       - name: Checkout master
         run: git checkout master
       - name: Format code
         run: |
-          dprint fmt --config .github/config/dprint.json
+          npm install -g dprint
+          mkdir -v -p /home/runner/.cache/dprint/cache
+          npx dprint fmt --config .github/config/dprint.json
       - name: Publish formatted code
         run: |
           set +e
@@ -50,13 +47,13 @@ jobs:
     needs: [ format ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Setup NodeJS
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: 17
+          node-version: 20
       - name: Pull changes
         run: |
           git checkout master
@@ -73,13 +70,13 @@ jobs:
     needs: [ update-indexes ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Setup NodeJS
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: 17
+          node-version: 20
       - name: Pull
         run: git pull
       - name: Checkout main
@@ -96,7 +93,7 @@ jobs:
     needs: [ update-indexes ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Login to GitHub registry
         run: echo ${{ github.token }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Build docker image
@@ -159,6 +156,9 @@ jobs:
       CHESS_TOKEN: ${{ secrets.CHESS_TOKEN }}
       PAGESPEED_TOKEN: ${{ secrets.PAGESPEED_TOKEN }}
       GOOGLE_MAP_TOKEN: ${{ secrets.GOOGLE_MAP_TOKEN }}
+      SPLATOON_TOKEN: ${{ secrets.SPLATOON_TOKEN }}
+      SPLATOON_STATINK_TOKEN: ${{ secrets.SPLATOON_STATINK_TOKEN }}
+      SIXTEEN_PERSONALITIES_URL: ${{ secrets.SIXTEEN_PERSONALITIES_URL }}
       SPOTIFY_TOKENS: ${{ secrets.SPOTIFY_TOKENS }}
       STOCK_TOKEN: ${{ secrets.STOCK_TOKEN }}
       TWITTER_TOKEN: ${{ secrets.TWITTER_TOKEN }}
@@ -178,15 +178,19 @@ jobs:
     if: contains(github.event.head_commit.message, '[release]')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Login to GitHub registry
         run: echo ${{ github.token }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Pull docker image (master)
         run: docker pull ghcr.io/lowlighter/metrics:master
       - name: Tag docker image (release)
-        run: docker tag ghcr.io/lowlighter/metrics:master ghcr.io/lowlighter/metrics:$(echo '${{ github.event.head_commit.message }}' | grep -Po 'v\d+[.]\d+')
+        env:
+          GITHUB_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: docker tag ghcr.io/lowlighter/metrics:master ghcr.io/lowlighter/metrics:$(echo $GITHUB_COMMIT_MESSAGE | grep -Po 'v\d+[.]\d+')
       - name: Publish release to GitHub registry
-        run: docker push ghcr.io/lowlighter/metrics:$(echo '${{ github.event.head_commit.message }}' | grep -Po 'v\d+[.]\d+')
+        env:
+          GITHUB_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: docker push ghcr.io/lowlighter/metrics:$(echo $GITHUB_COMMIT_MESSAGE | grep -Po 'v\d+[.]\d+')
       - name: Tag docker image (latest)
         run: docker tag ghcr.io/lowlighter/metrics:master ghcr.io/lowlighter/metrics:latest
       - name: Publish latest to GitHub registry
@@ -199,13 +203,13 @@ jobs:
     needs: [ docker-release ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Setup NodeJS
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: 17
+          node-version: 20
       - name: Setup metrics
         run: npm ci
       - name: Pull
@@ -252,11 +256,11 @@ jobs:
     needs: [ action-latest-test, deploy-latest ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup NodeJS
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: 17
+          node-version: 20
       - name: Setup metrics
         run: npm ci
       - name: Publish release

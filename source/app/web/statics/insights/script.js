@@ -138,7 +138,8 @@
                   console.warn(`${plugin}: no data yet, retrying in ${interval} seconds`)
                   await new Promise(solve => setTimeout(solve, interval * 1000))
                 }
-              } while (--attempts)
+              }
+              while (--attempts)
               completed++
               this.progress = completed / (data.plugins.length + 1)
               this.loaded.push(plugin)
@@ -168,6 +169,9 @@
     computed: {
       params() {
         return new URLSearchParams({from: location.href})
+      },
+      warnings() {
+        return Object.entries(this.metrics?.rendered.plugins ?? {}).map(([_, value]) => value?.error).filter(value => value)
       },
       stats() {
         return this.metrics?.rendered.user ?? null

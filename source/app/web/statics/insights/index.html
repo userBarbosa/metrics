@@ -8,9 +8,9 @@
     <meta name="author" content="lowlighter">
     <meta property="og:image" content="/.opengraph.png">
     <link rel="icon" href="/.favicon.png">
-    <link rel="stylesheet" href="/.css/style.vars.css?v=3.29">
-    <link rel="stylesheet" href="/.css/style.css?v=3.29">
-    <link rel="stylesheet" href="/insights/.statics/style.css?v=3.29">
+    <link rel="stylesheet" href="/.css/style.vars.css?v=3.34">
+    <link rel="stylesheet" href="/.css/style.css?v=3.34">
+    <link rel="stylesheet" href="/insights/.statics/style.css?v=3.34">
   </head>
   <body>
     <!-- Vue app -->
@@ -84,6 +84,12 @@
         </section>
 
         <template v-if="metrics">
+
+          <section class="container">
+            <div class="warning" v-if="warnings.length">
+              <div v-for="warning in warnings">⚠️ {{ warning.message }}</div>
+            </div>
+          </section>
 
           <section class="container">
             <a :href="`https://github.com/${user}`" class="user">
@@ -314,7 +320,7 @@
                 <p>
                   <b>{{ user }}</b> has used {{ languages.length }} different language{{ format("plural", languages.length) }} for a total of {{ format("number", languages.total) }} byte{{ format("plural", languages.total) }}.
                   <small class="footnote">
-                    Note that these numbers are based on results produced by <a href="github.com/github/linguist">GitHub linguist</a> from repositories owned by <b>{{ user }}</b> and that they may not be entirely accurate.
+                    Note that these numbers are based on results produced by <a href="https://github.com/Nixinova/LinguistJS">LinguistJS</a> from repositories owned by <b>{{ user }}</b> and may not be entirely accurate.
                   </small>
                 </p>
                 <div class="list">
@@ -595,6 +601,6 @@
     <!-- Scripts -->
     <script src="/.js/axios.min.js"></script>
     <script src="/.js/vue.min.js"></script>
-    <script src="/insights/.statics/script.js?v=3.29"></script>
+    <script src="/insights/.statics/script.js?v=3.34"></script>
   </body>
 </html>

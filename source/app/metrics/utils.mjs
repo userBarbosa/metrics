@@ -1,19 +1,19 @@
 //Imports
 import octicons from "@primer/octicons"
+import twemojis from "@twemoji/parser"
 import axios from "axios"
 import processes from "child_process"
 import crypto from "crypto"
 import { minify as csso } from "csso"
 import * as d3 from "d3"
-import D3node from "d3-node"
 import emoji from "emoji-name-map"
 import { fileTypeFromBuffer } from "file-type"
 import fss from "fs"
 import fs from "fs/promises"
+import { JSDOM } from "jsdom"
 import linguist from "linguist-js"
 import { marked } from "marked"
-import minimatch from "minimatch"
-import fetch from "node-fetch"
+import { minimatch } from "minimatch"
 import opengraph from "open-graph-scraper"
 import os from "os"
 import paths from "path"
@@ -23,19 +23,17 @@ import prism_lang from "prismjs/components/index.js"
 import _puppeteer from "puppeteer"
 import purgecss from "purgecss"
 import readline from "readline"
-import rss from "rss-parser"
 import htmlsanitize from "sanitize-html"
 import sharp from "sharp"
 import git from "simple-git"
 import SVGO from "svgo"
-import twemojis from "twemoji-parser"
 import url from "url"
 import util from "util"
 import xmlformat from "xml-formatter"
 prism_lang()
 
 //Exports
-export { axios, d3, D3node, emoji, fetch, fs, git, minimatch, opengraph, os, paths, processes, rss, sharp, url, util }
+export { axios, d3, emoji, fs, git, minimatch, opengraph, os, paths, processes, sharp, url, util }
 
 /**Returns module __dirname */
 export function __module(module) {
@@ -52,7 +50,8 @@ export const puppeteer = {
       ignoreDefaultArgs: ["--disable-extensions"],
     })
   },
-  headless: true,
+  headless: "new",
+  events: ["load", "domcontentloaded", "networkidle2"],
 }
 
 /**Plural formatter */
@@ -207,14 +206,6 @@ export function stripemojis(string) {
   return string.replace(/[^\p{L}\p{N}\p{P}\p{Z}^$\n]/gu, "")
 }
 
-/**Chartist */
-export async function chartist() {
-  const css = `<style data-optimizable="true">${await fs.readFile(paths.join(__module(import.meta.url), "../../../node_modules", "node-chartist/dist/main.css")).catch(_ => "")}</style>`
-  const {default: nodechartist} = await import(url.pathToFileURL(paths.join(__module(import.meta.url), "../../../node_modules", "/node-chartist/lib/index.js")))
-  return (await nodechartist(...arguments))
-    .replace(/class="ct-chart-line">/, `class="ct-chart-line">${css}`)
-}
-
 /**Language analyzer (single file) */
 export async function language({filename, patch}) {
   console.debug(`metrics/language > ${filename}`)
@@ -225,17 +216,19 @@ export async function language({filename, patch}) {
 }
 
 /**Run command (use this to execute commands and process whole output at once, may not be suitable for large outputs) */
-export async function run(command, options, {prefixed = true, log = true} = {}) {
+export async function run(command, options, {prefixed = true, log = true, debug = true} = {}) {
   const prefix = {win32: "wsl"}[process.platform] ?? ""
   command = `${prefixed ? prefix : ""} ${command}`.trim()
   return new Promise((solve, reject) => {
-    console.debug(`metrics/command/run > ${command}`)
+    if (debug)
+      console.debug(`metrics/command/run > ${command}`)
     const child = processes.exec(command, options)
     let [stdout, stderr] = ["", ""]
     child.stdout.on("data", data => stdout += data)
     child.stderr.on("data", data => stderr += data)
     child.on("close", code => {
-      console.debug(`metrics/command/run > ${command} > exited with code ${code}`)
+      if (debug)
+        console.debug(`metrics/command/run > ${command} > exited with code ${code}`)
       if (log) {
         console.debug(stdout)
         console.debug(stderr)
@@ -246,7 +239,7 @@ export async function run(command, options, {prefixed = true, log = true} = {}) 
 }
 
 /**Spawn command (use this to execute commands and process output on the fly) */
-export async function spawn(command, args = [], options = {}, {prefixed = true, timeout = 300 * 1000, stdout} = {}) { //eslint-disable-line max-params
+export async function spawn(command, args = [], options = {}, {prefixed = true, timeout = 300 * 1000, stdout, debug = true} = {}) { //eslint-disable-line max-params
   const prefix = {win32: "wsl"}[process.platform] ?? ""
   if ((prefixed) && (prefix)) {
     args.unshift(command)
@@ -255,15 +248,18 @@ export async function spawn(command, args = [], options = {}, {prefixed = true, 
   if (!stdout)
     throw new Error("`stdout` argument was not provided, use run() instead of spawn() if processing output is not needed")
   return new Promise((solve, reject) => {
-    console.debug(`metrics/command/spawn > ${command} with ${args.join(" ")}`)
+    if (debug)
+      console.debug(`metrics/command/spawn > ${command} with ${args.join(" ")}`)
     const child = processes.spawn(command, args, {...options, shell: true, timeout})
     const reader = readline.createInterface({input: child.stdout})
     reader.on("line", stdout)
     const closed = new Promise(close => reader.on("close", close))
     child.on("close", async code => {
-      console.debug(`metrics/command/spawn > ${command} with ${args.join(" ")} > exited with code ${code}`)
+      if (debug)
+        console.debug(`metrics/command/spawn > ${command} with ${args.join(" ")} > exited with code ${code}`)
       await closed
-      console.debug(`metrics/command/spawn > ${command} with ${args.join(" ")} > reader closed`)
+      if (debug)
+        console.debug(`metrics/command/spawn > ${command} with ${args.join(" ")} > reader closed`)
       return code === 0 ? solve() : reject()
     })
   })
@@ -372,7 +368,7 @@ export const filters = {
     return result
   },
   /**Repository filter*/
-  repo(repository, patterns) {
+  repo(repository, patterns, {debug = true} = {}) {
     //Disable filtering when no pattern is provided
     if (!patterns.length)
       return true
@@ -387,14 +383,42 @@ export const filters = {
     }
     user = (user ?? repository.split("/")[0]).toLocaleLowerCase()
     repo = (repo ?? repository.split("/")[1]).toLocaleLowerCase()
+    const handle = `${user}/${repo}`
 
+    let include = true
+    //Advanced pattern matching
+    if (patterns[0] === "@use.patterns") {
+      if (debug)
+        console.debug(`metrics/filters/repo > ${repo} > using advanced pattern matching`)
+      const options = {nocase: true}
+      for (let pattern of patterns) {
+        if (pattern.startsWith("#"))
+          continue
+        let action = false
+        if ((pattern.startsWith("+")) || (pattern.startsWith("-"))) {
+          action = pattern.charAt(0) === "+"
+          pattern = pattern.substring(1)
+        }
+        if (minimatch(handle, pattern, options)) {
+          if (debug)
+            console.debug(`metrics/filters/repo > ${repo} matches ${action ? "including" : "excluding"} pattern ${pattern}`)
+          include = action
+        }
+      }
+    }
     //Basic pattern matching
-    const include = (!patterns.includes(repo)) && (!patterns.includes(`${user}/${repo}`))
-    console.debug(`metrics/filters/repo > filter ${repo} (${include ? "included" : "excluded"})`)
+    else {
+      if (debug)
+        console.debug(`metrics/filters/repo > ${repo} > using basic pattern matching`)
+      include = (!patterns.includes(repo)) && (!patterns.includes(handle))
+    }
+
+    if (debug)
+      console.debug(`metrics/filters/repo > filter ${repo} (${include ? "included" : "excluded"})`)
     return include
   },
   /**Text filter*/
-  text(text, patterns) {
+  text(text, patterns, {debug = true} = {}) {
     //Disable filtering when no pattern is provided
     if (!patterns.length)
       return true
@@ -404,29 +428,37 @@ export const filters = {
 
     //Basic pattern matching
     const include = !patterns.includes(text)
-    console.debug(`metrics/filters/text > filter ${text} (${include ? "included" : "excluded"})`)
+    if (debug)
+      console.debug(`metrics/filters/text > filter ${text} (${include ? "included" : "excluded"})`)
     return include
   },
 }
 
 /**Image to base64 */
 export async function imgb64(image, {width, height, fallback = true} = {}) {
+  //Ignore already encoded-base 64
+  if ((typeof image === "string") && (image.startsWith("data:image/png;base64")))
+    return image
   //Undefined image
   if (!image)
     return fallback ? "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mOcOnfpfwAGfgLYttYINwAAAABJRU5ErkJggg==" : null
+  //SVG image
+  if ((typeof image === "string") && (image.endsWith(".svg")))
+    return `data:image/svg+xml;base64,${Buffer.from(await fetch(image).then(response => response.arrayBuffer())).toString("base64")}`
   //Load image
   let ext = "png"
   try {
     if (image.startsWith("http://") || image.startsWith("https://")) {
       const buffer = Buffer.from(await fetch(image).then(response => response.arrayBuffer()))
-      ext = (await fileTypeFromBuffer(buffer)).ext ?? ext
+      ext = (await fileTypeFromBuffer(buffer))?.ext ?? ext
       image = sharp(buffer)
     }
     else {
       image = sharp(image)
     }
   }
-  catch {
+  catch (error) {
+    console.debug(`metrics/imgb64 > error > ${error}${fallback ? " (using fallback image instead)" : ""}`)
     return imgb64(null, {fallback})
   }
   //Resize image
@@ -456,7 +488,7 @@ export const svg = {
     console.debug("metrics/svg/pdf > loading svg")
     const page = await svg.resize.browser.newPage()
     page.on("console", ({_text: text}) => console.debug(`metrics/svg/pdf > puppeteer > ${text}`))
-    await page.setContent(`<main class="markdown-body">${rendered}</main>`, {waitUntil: ["load", "domcontentloaded", "networkidle2"]})
+    await page.setContent(`<main class="markdown-body">${rendered}</main>`, {waitUntil: puppeteer.events})
     console.debug("metrics/svg/pdf > loaded svg successfully")
     const margins = (Array.isArray(paddings) ? paddings : paddings.split(",")).join(" ")
     console.debug(`metrics/svg/pdf > margins set to ${margins}`)
@@ -484,7 +516,7 @@ export const svg = {
     const padding = {width: 1, height: 1, absolute: {width: 0, height: 0}}
     paddings = Array.isArray(paddings) ? paddings : `${paddings}`.split(",").map(x => x.trim())
     for (const [i, dimension] of [[0, "width"], [1, "height"]]) {
-      let operands = (paddings?.[i] ?? paddings[0])
+      let operands = paddings?.[i] ?? paddings[0]
       let {relative} = operands.match(/(?<relative>[+-]?[\d.]+)%$/)?.groups ?? {}
       operands = operands.replace(relative, "").trim()
       let {absolute} = operands.match(/^(?<absolute>[+-]?[\d.]+)/)?.groups ?? {}
@@ -501,7 +533,7 @@ export const svg = {
     page
       .on("console", message => console.debug(`metrics/svg/resize > puppeteer > ${message.text()}`))
       .on("pageerror", error => console.debug(`metrics/svg/resize > puppeteer > ${error.message}`))
-    await page.setContent(rendered, {waitUntil: ["load", "domcontentloaded", "networkidle2"]})
+    await page.setContent(rendered, {waitUntil: puppeteer.events})
     console.debug("metrics/svg/resize > loaded svg successfully")
     await page.addStyleTag({content: "body { margin: 0; padding: 0; }"})
     let mime = "image/svg+xml"
@@ -575,7 +607,7 @@ export const svg = {
     }
     //Compute hash
     const page = await svg.resize.browser.newPage()
-    await page.setContent(rendered, {waitUntil: ["load", "domcontentloaded", "networkidle2"]})
+    await page.setContent(rendered, {waitUntil: puppeteer.events})
     const data = await page.evaluate(async () => {
       document.querySelector("footer")?.remove()
       return document.querySelector("svg").outerHTML
@@ -732,24 +764,249 @@ export async function gif({page, width, height, frames, x = 0, y = 0, repeat = t
   if (fss.existsSync(path))
     await fs.unlink(path)
   //Create encoder
-  const GIFEncoder = (await import("gifencoder")).default
-  const encoder = new GIFEncoder(width, height)
-  encoder.createWriteStream().pipe(fss.createWriteStream(path))
-  encoder.start()
-  encoder.setRepeat(repeat ? 0 : -1)
-  encoder.setDelay(delay)
-  encoder.setQuality(quality)
-  //Register frames
-  for (let i = 0; i < frames; i++) {
-    const buffer = new PNG(await page.screenshot({clip: {width, height, x, y}}))
-    encoder.addFrame(await new Promise(solve => buffer.decode(pixels => solve(pixels))))
-    if (frames % 10 === 0)
-      console.debug(`metrics/puppeteergif > processed ${i}/${frames} frames`)
+  try {
+    const GIFEncoder = (await import("gifencoder")).default
+    const encoder = new GIFEncoder(width, height)
+    encoder.createWriteStream().pipe(fss.createWriteStream(path))
+    encoder.start()
+    encoder.setRepeat(repeat ? 0 : -1)
+    encoder.setDelay(delay)
+    encoder.setQuality(quality)
+    //Register frames
+    for (let i = 0; i < frames; i++) {
+      const buffer = new PNG(await page.screenshot({clip: {width, height, x, y}}))
+      encoder.addFrame(await new Promise(solve => buffer.decode(pixels => solve(pixels))))
+      if (frames % 10 === 0)
+        console.debug(`metrics/puppeteergif > processed ${i}/${frames} frames`)
+    }
+    console.debug(`metrics/puppeteergif > processed ${frames}/${frames} frames`)
+    //Close encoder and convert to base64
+    encoder.finish()
+    const result = await fs.readFile(path, "base64")
+    await fs.unlink(path)
+    return `data:image/gif;base64,${result}`
   }
-  console.debug(`metrics/puppeteergif > processed ${frames}/${frames} frames`)
-  //Close encoder and convert to base64
-  encoder.finish()
-  const result = await fs.readFile(path, "base64")
-  await fs.unlink(path)
-  return `data:image/gif;base64,${result}`
+  catch (error) {
+    console.debug(`metrics/puppeteergif > could not create gif: ${error}`)
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mOcOnfpfwAGfgLYttYINwAAAABJRU5ErkJggg=="
+  }
+}
+
+/**D3 node wrapper (loosely based on https://github.com/d3-node/d3-node)*/
+export class D3node {
+  constructor() {
+    this.jsdom = new JSDOM()
+    this.document = this.jsdom.window.document
+  }
+
+  get element() {
+    return d3.select(this.document.body)
+  }
+
+  createSVG(width, height) {
+    const svg = this.element.append("svg").attr("xmlns", "http://www.w3.org/2000/svg")
+    if ((width) && (height))
+      svg.attr("width", width).attr("height", height)
+    return svg
+  }
+
+  svgString() {
+    return this.element.select("svg").node()?.outerHTML || ""
+  }
+}
+
+/**Graph utilities */
+export const Graph = {
+  /**Timeline graph */
+  timeline() {
+    return this.graph("time", ...arguments)
+  },
+  /**Line graph */
+  line() {
+    return this.graph("line", ...arguments)
+  },
+  /**Basic Graph */
+  graph(type, data, {area = true, points = true, text = true, low = NaN, high = NaN, match = null, labels = null, width = 480, height = 315, ticks = 0} = {}) {
+    //Generate SVG
+    const margin = {top: 10, left: 10, right: 10, bottom: 45}
+    const d3n = new D3node()
+    const svg = d3n.createSVG(width, height)
+
+    //Data
+    const X = data.map(({x}) => x)
+    const start = X.at(0)
+    const end = X.at(-1)
+    const Y = data.map(({y}) => y)
+    const extremum = Math.max(...Y)
+    high = !Number.isNaN(high) ? high : extremum
+    low = !Number.isNaN(low) ? low : 0
+    const T = data.map(({text}, i) => text ?? Y[i])
+
+    //Time range
+    const x = (type === "time" ? d3.scaleTime() : d3.scaleLinear())
+      .domain([start, end])
+      .range([margin.top, width - margin.left - margin.right])
+    let xticks = d3.axisBottom(x).tickSizeOuter(0)
+    if (labels)
+      xticks = xticks.tickFormat((_, i) => labels[i])
+    if (ticks)
+      xticks = xticks.ticks(ticks)
+    svg.append("g")
+      .attr("transform", `translate(${margin.left},${height - margin.bottom})`)
+      .call(xticks)
+      .call(g => g.select(".domain").attr("stroke", "rgba(127, 127, 127, .8)"))
+      .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0.5))
+      .selectAll("text")
+      .attr("transform", "translate(-5,5) rotate(-45)")
+      .style("text-anchor", "end")
+      .style("font-size", 20)
+      .attr("fill", "rgba(127, 127, 127, .8)")
+
+    //Data range
+    const y = d3.scaleLinear()
+      .domain([high, low])
+      .range([margin.left, height - margin.top - margin.bottom])
+    svg.append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`)
+      .call(d3.axisRight(y).ticks(Math.round(height / 50)).tickSize(width - margin.left - margin.right))
+      .call(g => g.select(".domain").remove())
+      .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0.5).attr("stroke-dasharray", "2,2"))
+      .call(g => g.selectAll(".tick text").attr("x", 0).attr("dy", -4))
+      .selectAll("text")
+      .style("font-size", 20)
+      .attr("fill", "rgba(127, 127, 127, .8)")
+
+    //Generate graph line
+    const datum = Y.map((y, i) => [X.at(i), y])
+    const tdatum = Y.map((y, i) => [X.at(i), y, T[i]])
+    const xticked = xticks.scale().ticks(xticks.ticks()[0])
+    const yticked = match?.(tdatum, xticked) ?? tdatum
+    svg.append("path")
+      .datum(datum)
+      .attr("transform", `translate(${margin.left},${margin.top})`)
+      .attr(
+        "d",
+        d3.line()
+          .curve(d3.curveLinear)
+          .x(d => x(d[0]))
+          .y(d => y(d[1])),
+      )
+      .attr("fill", "transparent")
+      .attr("stroke", "#87ceeb")
+      .attr("stroke-width", 2)
+
+    //Generate graph area
+    if (area) {
+      svg.append("path")
+        .datum(datum)
+        .attr("transform", `translate(${margin.left},${margin.top})`)
+        .attr(
+          "d",
+          d3.area()
+            .curve(d3.curveLinear)
+            .x(d => x(d[0]))
+            .y0(d => y(d[1]))
+            .y1(() => y(low)),
+        )
+        .attr("fill", "rgba(88, 166, 255, .1)")
+    }
+
+    //Generate graph points
+    if (points) {
+      svg.append("g")
+        .selectAll("circle")
+        .data(yticked)
+        .join("circle")
+        .attr("transform", `translate(${margin.left},${margin.top})`)
+        .attr("cx", d => x(d[0]))
+        .attr("cy", d => y(d[1]))
+        .attr("r", 2)
+        .attr("fill", "#106cbc")
+    }
+
+    //Generate graph text
+    if (text) {
+      svg.append("g")
+        .attr("fill", "currentColor")
+        .attr("text-anchor", "middle")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", 10)
+        .attr("stroke", "rgba(88, 166, 255, .05)")
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-width", 4)
+        .attr("paint-order", "stroke fill")
+        .selectAll("text")
+        .data(yticked)
+        .join("text")
+        .attr("transform", `translate(${margin.left},${margin.top - 4})`)
+        .attr("x", d => x(d[0]))
+        .attr("y", d => y(d[1]))
+        .text(d => d[2] ? d[2] : "")
+        .attr("fill", "rgba(127, 127, 127, .8)")
+    }
+
+    return d3n.svgString()
+  },
+  /**Pie Graph */
+  pie(data, {colors, width = 480, height = 315} = {}) {
+    //Generate SVG
+    const radius = Math.min(width, height) / 2
+    const d3n = new D3node()
+    const svg = d3n.createSVG(width, height)
+
+    //Data
+    const K = Object.keys(data)
+    const V = Object.values(data)
+    const I = d3.range(K.length).filter(i => !Number.isNaN(V[i]))
+
+    //Colors
+    const spectral = [...d3.schemeSpectral]
+    spectral[0] = ["#000000"]
+    spectral[1] = spectral[3].slice(0, 1)
+    spectral[2] = spectral[3].slice(0, 2)
+
+    //Construct arcs
+    const color = d3.scaleOrdinal(K, spectral[K.length])
+    const arcs = d3.pie().padAngle(1 / radius).sort(null).value(i => V[i])(I)
+    const arc = d3.arc().innerRadius(0).outerRadius(radius)
+    const labels = d3.arc().innerRadius(radius / 2).outerRadius(radius / 2)
+
+    svg.append("g")
+      .attr("transform", `translate(${width / 2},${height / 2})`)
+      .attr("stroke", "white")
+      .attr("stroke-width", 1)
+      .attr("stroke-linejoin", "round")
+      .selectAll("path")
+      .data(arcs)
+      .join("path")
+      .attr("fill", d => colors?.[K[d.data]] ?? color(K[d.data]))
+      .attr("d", arc)
+      .append("title")
+      .text(d => `${K[d.data]}\n${V[d.data]}`)
+
+    svg.append("g")
+      .attr("transform", `translate(${width / 2},${height / 2})`)
+      .attr("font-family", "sans-serif")
+      .attr("font-size", 12)
+      .attr("text-anchor", "middle")
+      .attr("fill", "white")
+      .attr("stroke", "rbga(0,0,0,.9)")
+      .attr("paint-order", "stroke fill")
+      .selectAll("text")
+      .data(arcs)
+      .join("text")
+      .attr("transform", d => `translate(${labels.centroid(d)})`)
+      .selectAll("tspan")
+      .data(d => {
+        const lines = `${K[d.data]}\n${V[d.data]}`.split(/\n/)
+        return (d.endAngle - d.startAngle) > 0.25 ? lines : lines.slice(0, 1)
+      })
+      .join("tspan")
+      .attr("x", 0)
+      .attr("y", (_, i) => `${i * 1.1}em`)
+      .attr("font-weight", (_, i) => i ? null : "bold")
+      .text(d => d)
+
+    return d3n.svgString()
+  },
 }

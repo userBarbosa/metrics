@@ -57,6 +57,60 @@ Content can be manually ordered using `config_order` option.
 > ℹ️ The handles to use for each plugin and sections is based on the [`partials/_.json`](/source/templates/classic/partials/_.json) of the template.
 > It may not necessarily be the plugin id (e.g. `base.header`, `base.activity+community`, `base.repositories`, etc.).
 
+## 🔕 Skipping repositories in plugins
+
+Some plugins support a `plugin_*_skipped` option which is used to skipped repositories from result. It inherits the global option [`repositories_skipped`](/source/plugins/base/README.md#repositories_skipped) which makes it easier to ignore repositories from all plugins at once.
+
+These options support two different syntaxes:
+
+### Basic pattern matching
+
+Skip repositories by:
+- using their full handle (e.g. `user/repo`)
+- using only their name (e.g. `repo`)
+  - *in this case, the owner may be implicitly set to current `user` option*
+
+*Example: skipping repositories with basic pattern matching*
+```yml
+repositories_skipped: my-repo, user/my-repo
+```
+
+> 💡 Either comma or newlines can be used to separate basic patterns
+
+### Advanced pattern matching
+
+To enable advanced pattern matching to skip repositories, include `@use.patterns` at the beginning of the option value.
+
+Skip repositories by writing file-glob patterns, with any of the supported operation:
+- `#` to write comments
+- `-` to exclude repositories
+  - *the `-` is implicit and may be omitted from excluding patterns*
+- `+` to include back repositories
+
+> ℹ️ *metrics* use [isaacs/minimatch](https://github.com/isaacs/minimatch) as its file-glob matcher
+
+*Example: skipping repositories with basic advanced matching*
+```yml
+repositories_skipped: |
+  @use.patterns
+
+  # Skip a specific repository (both patterns are equivalent)
+  user/repo
+  -user/repo
+
+  # Skip repositories matching a given pattern
+  user/repo-*
+  {user1, user2, user3}/*
+
+  # Include back a previously skipped repository
+  org/repo
+  +org/include-this-repo
+```
+
+> ℹ️ Unlike basic pattern matching, patterns are always tested against the full repository handle (the user will not be implicitly added)
+
+> ⚠️ As patterns may contain commas, be sure to use newlines rather than commas as separator to ensure patterns are correctly parsed
+
 ## 🪛 Using presets
 
 It is possible to reuse the same configuration across different repositories and workflows using configuration presets.
@@ -314,7 +368,7 @@ metrics:
     contents: write
   steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -420,7 +474,7 @@ When doing so, any settings which defaults on user fetched values will not be te
   <tr>
     <td nowrap="nowrap"><h4><code>user</code></h4></td>
     <td rowspan="2"><p>GitHub username</p>
-<p>Defaults to <code>token</code> owner username.</p>
+<p>Defaults to <a href="/source/plugins/core/README.md#token"><code>token</code></a> owner username.</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -444,7 +498,7 @@ When doing so, any settings which defaults on user fetched values will not be te
     <td rowspan="2"><p>GitHub Token used to commit metrics</p>
 <p>Leave this to <code>${{ github.token }}</code> or <code>${{ secrets.GITHUB_TOKEN }}</code>, which is a special auto-generated token restricted to current repository scope.</p>
 <blockquote>
-<p>💡 When using <code>output_action: gist</code>, it will use <code>token</code> instead, since gists are outside of scope</p>
+<p>💡 When using <a href="/source/plugins/core/README.md#output_action"><code>output_action: gist</code></a>, it will use <a href="/source/plugins/core/README.md#token"><code>token</code></a> instead, since gists are outside of scope</p>
 </blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
@@ -478,7 +532,7 @@ When doing so, any settings which defaults on user fetched values will not be te
   <tr>
     <td nowrap="nowrap"><h4><code>committer_gist</code></h4></td>
     <td rowspan="2"><p>Gist id</p>
-<p>Specify an existing gist id (can be retrieved from its URL) when using <code>output_action: gist</code>.</p>
+<p>Specify an existing gist id (can be retrieved from its URL) when using <a href="/source/plugins/core/README.md#output_action"><code>output_action: gist</code></a>.</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -489,7 +543,7 @@ When doing so, any settings which defaults on user fetched values will not be te
   <tr>
     <td nowrap="nowrap"><h4><code>filename</code></h4></td>
     <td rowspan="2"><p>Output path</p>
-<p>When using an asterisk (<code>*</code>), correct extension will automatically be applied according to <code>config_output</code> value</p>
+<p>When using an asterisk (<code>*</code>), correct extension will automatically be applied according to <a href="/source/plugins/core/README.md#config_output"><code>config_output</code></a> value</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -533,6 +587,9 @@ When doing so, any settings which defaults on user fetched values will not be te
 <blockquote>
 <p>💡 When using <code>pull-request</code>, you will need to set the last job with a <code>pull-request-*</code> action instead, else it won&#39;t be merged</p>
 </blockquote>
+<blockquote>
+<p>⚠️ As GitHub gists API does not support binary files upload, <code>gist</code> does not support <a href="/source/plugins/core/README.md#config_output"><code>config_output</code></a> set to either <code>png</code>, <code>jpeg</code> or <code>markdown-pdf</code></p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -548,6 +605,9 @@ When doing so, any settings which defaults on user fetched values will not be te
 <li><code>always</code>: always try to push changes</li>
 <li><code>data-changed</code>: skip changes if no data changed (e.g. like when only metadata changed)</li>
 </ul>
+<blockquote>
+<p>ℹ️ This option is only revelant when <a href="/source/plugins/core/README.md#config_output"><code>config_output: svg</code></a> is set</p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -562,9 +622,9 @@ When doing so, any settings which defaults on user fetched values will not be te
 <ul>
 <li><code>css</code>: purge and minify CSS styles</li>
 <li><code>xml</code>: pretty-print XML (useful to reduce diff)</li>
-<li><code>svg</code>: optimization with SVGO (experimental, require <code>--optimize-svg</code> experimental flag)</li>
+<li><code>svg</code>: optimization with SVGO (experimental, requires <a href="/source/plugins/core/README.md#experimental_features"><code>experimental_features: --optimize-svg</code></a>)</li>
 </ul>
-<p>Some templates may not support all options</p>
+<p>Templates may not always honour all provided options</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -621,6 +681,9 @@ This is mostly useful for custom templates.</p>
     <td rowspan="2"><p>Extra CSS</p>
 <p>Custom CSS that will be injected in used template.
 Useful to avoid creating a new template just to tweak some styling</p>
+<blockquote>
+<p>💡 <em>metrics</em> tends to avoid using <code>!important</code> rules, which means that most styling can be overridden by this option when using <code>!important</code></p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -636,8 +699,11 @@ Useful to avoid creating a new template just to tweak some styling</p>
     <td rowspan="2"><p>Extra JavaScript</p>
 <p>Custom JavaScript that will be executed during puppeteer rendering.
 Useful to avoid creating a new template just to tweak some content.</p>
-<p>Note that is it executed within puppeteer context and <strong>not</strong> <em>metrics</em> context.
+<blockquote>
+<p>⚠️ Note that is it executed within puppeteer context and <strong>not</strong> within <em>metrics</em> context.
+No access to fetched data or configuration will be offered through this context.
 It is run after transformations and optimizations, but just before resizing.</p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -665,6 +731,9 @@ Leave empty to use default endpoint.</p>
     <td rowspan="2"><p>GitHub GraphQL API endpoint</p>
 <p>Can be used to support <a href="https://github.com/enterprise">GitHub enterprises server</a>.
 Leave empty to use default endpoint.</p>
+<blockquote>
+<p>ℹ️ GraphQL octokit will automatically append <code>/graphql</code> to provided endpoint</p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -715,7 +784,7 @@ May increase filesize.</p>
     <td rowspan="2"><p>Use GitHub custom emojis</p>
 <p>GitHub supports additional emojis which are not registered in Unicode standard (:octocat:, :shipit:, :trollface:, ...)
 See full list at <a href="https://api.github.com/emojis">https://api.github.com/emojis</a>.</p>
-<p>This option has no effect when <code>token: NOT_NEEDED</code> is set.</p>
+<p>This option has no effect when [`token: NOT_NEEDED``](/source/plugins/core/README.md#token) is set.</p>
 <p>May increase filesize</p>
 <img width="900" height="1" alt=""></td>
   </tr>
@@ -797,9 +866,9 @@ It can result in cropped or oversized outputs.</p>
 </ul>
 <p>Each value need to respect the following format:</p>
 <ul>
-<li>{number}</li>
-<li>{number} + {number}%</li>
-<li>{number}%</li>
+<li><code>{number}</code></li>
+<li><code>{number} + {number}%</code></li>
+<li><code>{number}%</code></li>
 </ul>
 <p>Percentage are relative to computed dimensions</p>
 <img width="900" height="1" alt=""></td>
@@ -933,7 +1002,7 @@ Be sure to disable this option when asking for help or submitting bug reports.</
     <td nowrap="nowrap"><h4><code>quota_required_rest</code></h4></td>
     <td rowspan="2"><p>Minimum GitHub REST API requests quota required to run</p>
 <p>Action will cancel itself without any errors if requirements are not met</p>
-<p>This option has no effect when <code>token</code> is set to <code>NOT_NEEDED</code></p>
+<p>This option has no effect when <a href="/source/plugins/core/README.md#token"><code>token: NOT_NEEDED</code></a> is set</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -948,7 +1017,7 @@ Be sure to disable this option when asking for help or submitting bug reports.</
     <td nowrap="nowrap"><h4><code>quota_required_graphql</code></h4></td>
     <td rowspan="2"><p>Minimum GitHub GraphQL API requests quota required to run</p>
 <p>Action will cancel itself without any errors if requirements are not met</p>
-<p>This option has no effect when <code>token</code> is set to <code>NOT_NEEDED</code></p>
+<p>This option has no effect when <a href="/source/plugins/core/README.md#token"><code>token: NOT_NEEDED</code></a> is set</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -963,7 +1032,7 @@ Be sure to disable this option when asking for help or submitting bug reports.</
     <td nowrap="nowrap"><h4><code>quota_required_search</code></h4></td>
     <td rowspan="2"><p>Minimum GitHub Search API requests quota required to run</p>
 <p>Action will cancel itself without any errors if requirements are not met</p>
-<p>This option has no effect when <code>token</code> is set to <code>NOT_NEEDED</code></p>
+<p>This option has no effect when <a href="/source/plugins/core/README.md#token"><code>token: NOT_NEEDED</code></a> is set</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -1014,7 +1083,7 @@ This option has no effects on forks (images will always be rebuilt from Dockerfi
   <tr>
     <td nowrap="nowrap"><h4><code>debug</code></h4></td>
     <td rowspan="2"><p>Debug mode</p>
-<p>This setting is automatically enable if a job fail (useful with <code>plugins_errors_fatal: yes</code>)</p>
+<p>This setting is automatically enable if a job fail (useful with <a href="/source/plugins/core/README.md#plugins_errors_fatal"><code>plugins_errors_fatal: yes</code></a>)</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -1045,9 +1114,22 @@ This option has no effects on forks (images will always be rebuilt from Dockerfi
     <td rowspan="2"><p>Debug flags</p>
 <ul>
 <li><code>--cakeday</code>: simulate registration anniversary</li>
-<li><code>--halloween</code>: enable halloween colors</li>
+<li><code>--halloween</code>: enable halloween colors <em>(only first color scheme will be applied if multiple are specified)</em></li>
+<li><code>--winter</code>: enable winter colors <em>(only first color scheme will be applied if multiple are specified)</em></li>
 <li><code>--error</code>: force render error</li>
+<li><code>--puppeteer-debug</code>: enable puppeteer debug mode*</li>
+<li><code>--puppeteer-disable-headless</code>: disable puppeteer headless mode <em>(requires a graphical environment)</em>*</li>
+<li><code>--puppeteer-wait-load</code>: override puppeteer wait events*</li>
+<li><code>--puppeteer-wait-domcontentloaded</code>: override puppeteer wait events*</li>
+<li><code>--puppeteer-wait-networkidle0</code>: override puppeteer wait events*</li>
+<li><code>--puppeteer-wait-networkidle2</code>: override puppeteer wait events*</li>
 </ul>
+<blockquote>
+<p><em>* 🌐 Web instances needs to have <a href="/source/plugins/core/README.md#debug"><code>debug</code></a> set in <code>settings.json</code> for these flags to be supported.</em></p>
+</blockquote>
+<blockquote>
+<p>⚠️ No backward compatibility is guaranteed for these features, they are only meant for debugging purposes.</p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -1056,7 +1138,7 @@ This option has no effects on forks (images will always be rebuilt from Dockerfi
 <b>type:</b> <code>array</code>
 <i>(space-separated)</i>
 <br>
-<b>allowed values:</b><ul><li>--cakeday</li><li>--halloween</li><li>--error</li></ul></td>
+<b>allowed values:</b><ul><li>--cakeday</li><li>--halloween</li><li>--winter</li><li>--error</li><li>--puppeteer-debug</li><li>--puppeteer-disable-headless</li><li>--puppeteer-wait-load</li><li>--puppeteer-wait-domcontentloaded</li><li>--puppeteer-wait-networkidle0</li><li>--puppeteer-wait-networkidle2</li></ul></td>
   </tr>
   <tr>
     <td nowrap="nowrap"><h4><code>debug_print</code></h4></td>
@@ -1073,7 +1155,9 @@ This option has no effects on forks (images will always be rebuilt from Dockerfi
   <tr>
     <td nowrap="nowrap"><h4><code>dryrun</code></h4></td>
     <td rowspan="2"><p>Dry-run</p>
-<p>Contrary to <code>output_action: none</code>, output file won&#39;t be available in <code>/metrics_renders</code> directory</p>
+<blockquote>
+<p>⚠️ Unlike <a href="/source/plugins/core/README.md#output_action"><code>output_action: none</code></a>, output file won&#39;t be available in <code>/metrics_renders</code> directory</p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -1086,7 +1170,9 @@ This option has no effects on forks (images will always be rebuilt from Dockerfi
   <tr>
     <td nowrap="nowrap"><h4><code>experimental_features</code></h4></td>
     <td rowspan="2"><p>Experimental features</p>
-<p>No backward compatibility is guaranteed for these features</p>
+<blockquote>
+<p>⚠️ No backward compatibility is guaranteed for these features</p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>

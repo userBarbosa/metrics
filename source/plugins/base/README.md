@@ -92,7 +92,7 @@ This currently improves the accuracy of the following statistics:</p>
     <td rowspan="2"><p>Skip base content</p>
 <blockquote>
 <p>⚠️ Any plugin that relies on base content data may break!
-Only use this option when using a plugin that can be configured with <code>token: NOT_NEEDED</code></p>
+Only use this option when using a plugin that can be configured with <a href="/source/plugins/core/README.md#token"><code>token: NOT_NEEDED</code></a></p>
 </blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
@@ -167,7 +167,7 @@ Broad affiliations will result in less representative metrics.</p>
   <tr>
     <td nowrap="nowrap">⏭️ Global option<br>
 <b>type:</b> <code>array</code>
-<i>(comma-separated)</i>
+<i>(newline-separated)</i>
 <br></td>
   </tr>
   <tr>

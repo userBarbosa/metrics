@@ -313,8 +313,16 @@ inputs:
     description: Indepth mode
     default: <default-value>
 
+  plugin_languages_indepth_custom:
+    description: Indepth mode - Custom repositories
+    default: <default-value>
+
   plugin_languages_analysis_timeout:
     description: Indepth mode - Analysis timeout
+    default: <default-value>
+
+  plugin_languages_analysis_timeout_repositories:
+    description: Indepth mode - Analysis timeout (repositories)
     default: <default-value>
 
   plugin_languages_categories:
@@ -326,11 +334,11 @@ inputs:
     default: <default-value>
 
   plugin_languages_recent_load:
-    description: Events to load (recently-used section)
+    description: Indepth mode - Events to load (recently-used section)
     default: <default-value>
 
   plugin_languages_recent_days:
-    description: Events maximum age (day, recently-used section)
+    description: Indepth mode - Events maximum age (day, recently-used section)
     default: <default-value>
 
   # ====================================================================================
@@ -338,6 +346,10 @@ inputs:
 
   plugin_stargazers:
     description: Enable stargazers plugin
+    default: <default-value>
+
+  plugin_stargazers_days:
+    description: Time range
     default: <default-value>
 
   plugin_stargazers_charts:
@@ -381,6 +393,10 @@ inputs:
 
   plugin_lines_history_limit:
     description: Years to display
+    default: <default-value>
+
+  plugin_lines_delay:
+    description: Delay before performing a second query
     default: <default-value>
 
   # ====================================================================================
@@ -604,14 +620,18 @@ inputs:
     default: <default-value>
 
   # ====================================================================================
-  # 🙋 Introduction
+  # 💝 GitHub Sponsorships
 
-  plugin_introduction:
-    description: Enable introduction plugin
+  plugin_sponsorships:
+    description: Enable sponsorships plugin
     default: <default-value>
 
-  plugin_introduction_title:
-    description: Section title
+  plugin_sponsorships_sections:
+    description: Displayed sections
+    default: <default-value>
+
+  plugin_sponsorships_size:
+    description: Profile picture display size
     default: <default-value>
 
   # ====================================================================================
@@ -915,6 +935,17 @@ inputs:
     default: <default-value>
 
   # ====================================================================================
+  # 🙋 Introduction
+
+  plugin_introduction:
+    description: Enable introduction plugin
+    default: <default-value>
+
+  plugin_introduction_title:
+    description: Section title
+    default: <default-value>
+
+  # ====================================================================================
   # 🌇 GitHub Skyline
 
   plugin_skyline:
@@ -1203,8 +1234,69 @@ inputs:
     description: Display limit (skills)
     default: <default-value>
 
+  plugin_leetcode_ignored_skills:
+    description: Ignored skills
+    default: <default-value>
+
   plugin_leetcode_limit_recent:
     description: Display limit (recent)
+    default: <default-value>
+
+  # ====================================================================================
+  # 🕹️ Steam
+
+  plugin_steam:
+    description: Enable steam plugin
+    default: <default-value>
+
+  plugin_steam_token:
+    description: Steam token
+    default: <default-value>
+
+  plugin_steam_sections:
+    description: Displayed sections
+    default: <default-value>
+
+  plugin_steam_user:
+    description: Steam user id
+
+  plugin_steam_games_ignored:
+    description: Ignored games
+    default: <default-value>
+
+  plugin_steam_games_limit:
+    description: Display limit (Most played games)
+    default: <default-value>
+
+  plugin_steam_recent_games_limit:
+    description: Display limit (Recently played games)
+    default: <default-value>
+
+  plugin_steam_achievements_limit:
+    description: Display limit (Games achievements)
+    default: <default-value>
+
+  plugin_steam_playtime_threshold:
+    description: Display threshold (Game playtime in hours)
+    default: <default-value>
+
+  # ====================================================================================
+  # 🧠 16personalities
+
+  plugin_16personalities:
+    description: Enable 16personalities plugin
+    default: <default-value>
+
+  plugin_16personalities_url:
+    description: Profile URL
+    default: <default-value>
+
+  plugin_16personalities_sections:
+    description: Displayed sections
+    default: <default-value>
+
+  plugin_16personalities_scores:
+    description: Display traits scores
     default: <default-value>
 
   # ====================================================================================
@@ -1219,7 +1311,7 @@ inputs:
     default: <default-value>
 
   plugin_chess_user:
-    description: AniList login
+    description: Chess platform login
     default: <default-value>
 
   plugin_chess_platform:
@@ -1228,6 +1320,29 @@ inputs:
 
   plugin_chess_animation:
     description: Animation settings
+    default: <default-value>
+
+  # ====================================================================================
+  # 🪙 Crypto
+
+  plugin_crypto:
+    description: Enable crypto plugin
+    default: <default-value>
+
+  plugin_crypto_id:
+    description: Crypto id
+    default: <default-value>
+
+  plugin_crypto_vs_currency:
+    description: The target currency of market data (usd, eur, jpy, etc.)
+    default: <default-value>
+
+  plugin_crypto_days:
+    description: Data up to number of days ago (eg. 1,14,30,max)
+    default: <default-value>
+
+  plugin_crypto_precision:
+    description: The number of decimal places to use
     default: <default-value>
 
   # ====================================================================================
@@ -1302,8 +1417,55 @@ inputs:
     description: CSS Selector
     default: <default-value>
 
+  plugin_screenshot_mode:
+    description: Output mode
+    default: <default-value>
+
+  plugin_screenshot_viewport:
+    description: Viewport options
+    default: <default-value>
+
+  plugin_screenshot_wait:
+    description: Wait time before taking screenshot (ms)
+    default: <default-value>
+
   plugin_screenshot_background:
     description: Background
+    default: <default-value>
+
+  # ====================================================================================
+  # 🦑 Splatoon
+
+  plugin_splatoon:
+    description: Enable splatoon plugin
+    default: <default-value>
+
+  plugin_splatoon_token:
+    description: Splatnet token
+    default: <default-value>
+
+  plugin_splatoon_sections:
+    description: Displayed sections
+    default: <default-value>
+
+  plugin_splatoon_versus_limit:
+    description: Display limit (Versus)
+    default: <default-value>
+
+  plugin_splatoon_salmon_limit:
+    description: Display limit (Salmon run)
+    default: <default-value>
+
+  plugin_splatoon_statink:
+    description: stat.ink integration
+    default: <default-value>
+
+  plugin_splatoon_statink_token:
+    description: stat.ink token
+    default: <default-value>
+
+  plugin_splatoon_source:
+    description: Source
     default: <default-value>
 
   # ====================================================================================
@@ -1334,7 +1496,7 @@ inputs:
 # Action metadata
 name: Metrics embed
 author: lowlighter
-description: An infographics generator with 40+ plugins and 200+ options to display stats about your GitHub account!
+description: An infographics generator with 40+ plugins and 300+ options to display stats about your GitHub account!
 branding:
   icon: user-check
   color: gray-dark

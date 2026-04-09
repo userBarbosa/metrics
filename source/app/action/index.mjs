@@ -171,9 +171,11 @@ function quit(reason) {
     info("GitHub token", token, {token: true})
     //A GitHub token should start with "gh" along an additional letter for type
     //See https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats
-    info("GitHub token format", /^gh[pousr]_/.test(token) ? "correct" : "(old or invalid)")
+    info("GitHub token format", /^github_pat_/.test(token) ? "fine-grained" : /^gh[pousr]_/.test(token) ? "classic" : "legacy or invalid")
     if (!token)
       throw new Error("You must provide a valid GitHub personal token to gather your metrics (see https://github.com/lowlighter/metrics/blob/master/.github/readme/partials/documentation/setup/action.md for more informations)")
+    if (/^github_pat_/.test(token))
+      throw new Error("It seems you're trying to use a fine-grained personal access token. These are currently unsupported as GitHub does not support them (yet?) for GraphQL API authentication (see https://docs.github.com/fr/graphql/guides/forming-calls-with-graphql#authenticating-with-graphql for more informations). Use a classic token instead.")
     conf.settings.token = token
     const api = {}
     const resources = {}
@@ -318,6 +320,9 @@ function quit(reason) {
         console.debug(error)
       }
       info("Previous render sha", committer.sha ?? "(none)")
+      //Compatibility check
+      if ((_action === "gist") && (["png", "jpeg", "markdown-pdf"].includes(_output)))
+        throw new Error(`"config_output: ${_output}" is not supported with "config_action: ${_action}"`)
     }
     else if (dryrun) {
       info("Dry-run", true)
@@ -398,18 +403,29 @@ function quit(reason) {
     //Render metrics
     info.break()
     info.section("Rendering")
-    let rendered = await retry(async () => {
-      const {rendered, errors} = await metrics({login: user, q}, {graphql, rest, plugins, conf, die, verify, convert}, {Plugins, Templates})
+    let {rendered, mime} = await retry(async () => {
+      const {rendered, mime, errors} = await metrics({login: user, q}, {graphql, rest, plugins, conf, die, verify, convert}, {Plugins, Templates})
       if (errors.length) {
         console.warn(`::group::${errors.length} error(s) occurred`)
         console.warn(util.inspect(errors, {depth: Infinity, maxStringLength: 256}))
         console.warn("::endgroup::")
       }
-      return rendered
+      return {rendered, mime}
     }, {retries, delay: retries_delay})
     if (!rendered)
       throw new Error("Could not render metrics")
     info("Status", "complete")
+    info("MIME type", mime)
+    const buffer = {
+      _content: null,
+      get content() {
+        return this._content
+      },
+      set content(value) {
+        this._content = Buffer.isBuffer(value) ? value : Buffer.from(typeof value === "object" ? JSON.stringify(value) : `${value}`)
+      },
+    }
+    buffer.content = rendered
 
     //Debug print
     if (dprint) {
@@ -421,27 +437,32 @@ function quit(reason) {
     //Output condition
     info.break()
     info.section("Saving")
-    info("Output condition", _output_condition)
-    if ((_output_condition === "data-changed") && ((committer.commit) || (committer.pr))) {
-      const {svg} = await import("../metrics/utils.mjs")
-      let data = ""
-      await retry(async () => {
-        try {
-          data = `${Buffer.from((await committer.rest.repos.getContent({...github.context.repo, ref: `heads/${committer.head}`, path: filename})).data.content, "base64")}`
-        }
-        catch (error) {
-          if (error.response.status !== 404)
-            throw error
-        }
-      }, {retries: retries_output_action, delay: retries_delay_output_action})
-      const previous = await svg.hash(data)
-      info("Previous hash", previous)
-      const current = await svg.hash(rendered)
-      info("Current hash", current)
-      const changed = (previous !== current)
-      info("Content changed", changed)
-      if (!changed)
-        committer.commit = false
+    if (_output === "svg") {
+      info("Output condition", _output_condition)
+      if ((_output_condition === "data-changed") && ((committer.commit) || (committer.pr))) {
+        const {svg} = await import("../metrics/utils.mjs")
+        let data = ""
+        await retry(async () => {
+          try {
+            data = `${Buffer.from((await committer.rest.repos.getContent({...github.context.repo, ref: `heads/${committer.head}`, path: filename})).data.content, "base64")}`
+          }
+          catch (error) {
+            if (error.response.status !== 404)
+              throw error
+          }
+        }, {retries: retries_output_action, delay: retries_delay_output_action})
+        const previous = await svg.hash(data)
+        info("Previous hash", previous)
+        const current = await svg.hash(rendered)
+        info("Current hash", current)
+        const changed = previous !== current
+        info("Content changed", changed)
+        if (!changed)
+          committer.commit = false
+      }
+    }
+    else {
+      info("Output condition", `Not applicable for ${_output}`)
     }
 
     //Save output to renders output folder
@@ -449,7 +470,7 @@ function quit(reason) {
       info("Actions to perform", "(none)")
     else {
       await fs.mkdir(paths.dirname(paths.join("/renders", filename)), {recursive: true})
-      await fs.writeFile(paths.join("/renders", filename), Buffer.from(typeof rendered === "object" ? JSON.stringify(rendered) : `${rendered}`))
+      await fs.writeFile(paths.join("/renders", filename), buffer.content)
       info(`Save to /metrics_renders/${filename}`, "ok")
       info("Output action", _action)
     }
@@ -501,6 +522,9 @@ function quit(reason) {
             }
           }, {retries: retries_output_action, delay: retries_delay_output_action})
         }
+        buffer.content = rendered
+        await fs.writeFile(paths.join("/renders", filename), buffer.content)
+        info(`Update /metrics_renders/${filename}`, "ok")
       }
 
       //Check changes
@@ -517,7 +541,7 @@ function quit(reason) {
       //Upload to gist (this is done as user since committer_token may not have gist rights)
       if (committer.gist) {
         await retry(async () => {
-          await rest.gists.update({gist_id: committer.gist, files: {[filename]: {content: rendered}}})
+          await rest.gists.update({gist_id: committer.gist, files: {[filename]: {content: buffer.content.toString()}}})
           info(`Upload to gist ${committer.gist}`, "ok")
           committer.commit = false
         }, {retries: retries_output_action, delay: retries_delay_output_action})
@@ -530,7 +554,7 @@ function quit(reason) {
             ...github.context.repo,
             path: filename,
             message: committer.message,
-            content: Buffer.from(typeof rendered === "object" ? JSON.stringify(rendered) : `${rendered}`).toString("base64"),
+            content: buffer.content.toString("base64"),
             branch: committer.pr ? committer.head : committer.branch,
             ...(committer.sha ? {sha: committer.sha} : {}),
           })
@@ -608,7 +632,8 @@ function quit(reason) {
               info(`Branch ${committer.head}`, "(deleted)")
             }, {retries: retries_output_action, delay: retries_delay_output_action})
             break
-          } while (--attempts)
+          }
+          while (--attempts)
         }
       }
 

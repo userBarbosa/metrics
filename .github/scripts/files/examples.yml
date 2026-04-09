@@ -18,6 +18,12 @@ on:
         required: true
       GOOGLE_MAP_TOKEN:
         required: true
+      SPLATOON_TOKEN:
+        required: true
+      SPLATOON_STATINK_TOKEN:
+        required: true
+      SIXTEEN_PERSONALITIES_URL:
+        required: true
       SPOTIFY_TOKENS:
         required: true
       STOCK_TOKEN:
@@ -37,7 +43,7 @@ jobs:
     if: "github.repository == 'lowlighter/metrics'"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Checkout examples
@@ -54,7 +60,7 @@ jobs:
         if: ${{ success() || failure() }}
         run: |
           set +e
-          rm -rf /metrics_renders/metrics.markdown*.{md,pdf}
+          sudo rm -rf /metrics_renders/github-metrics.*
           sudo mv /metrics_renders/* ./
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
@@ -74,7 +80,7 @@ jobs:
     if: "github.repository == 'lowlighter/metrics'"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Checkout examples
@@ -134,10 +140,10 @@ jobs:
         if: ${{ success() || failure() }}
         run: |
           set +e
-          sudo mv /metrics_renders/* ./
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git pull
+          sudo cp /metrics_renders/* ./
           git add --all
           git commit -m "chore: update examples"
           git push --force

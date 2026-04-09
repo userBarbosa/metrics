@@ -28,22 +28,22 @@ export default async function({faker}, target, that, args) {
           author: {
             name: faker.internet.userName(),
             email: faker.internet.email(),
-            date: `${faker.date.recent(7)}`,
+            date: `${faker.date.recent({days: 7})}`,
           },
           committer: {
             name: faker.internet.userName(),
             email: faker.internet.email(),
-            date: `${faker.date.recent(7)}`,
+            date: `${faker.date.recent({days: 7})}`,
           },
           url: "https://api.github.com/repos/lowlighter/metrics/commits/MOCKED_SHA",
         },
         author: {
           login: faker.internet.userName(),
-          id: faker.datatype.number(100000000),
+          id: faker.number.int(100000000),
         },
         committer: {
           login: faker.internet.userName(),
-          id: faker.datatype.number(100000000),
+          id: faker.number.int(100000000),
         },
         files: [
           {
@@ -52,6 +52,7 @@ export default async function({faker}, target, that, args) {
             patch: '@@ -0,0 +1,5 @@\n+//Imports\n+  import app from "./src/app.mjs"\n+\n+//Start app\n+  await app()\n\\ No newline at end of file',
           },
         ],
+        parents: [],
       },
     })
   }
